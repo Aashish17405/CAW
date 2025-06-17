@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 
 const API = import.meta.env.VITE_API_URL;
 
-export default function FavoritesList({ onCitySelect, refreshTrigger }) {
+export default function FavoritesList({ onCitySelect, refreshTrigger ,triggerRefresh}) {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -84,7 +84,7 @@ export default function FavoritesList({ onCitySelect, refreshTrigger }) {
               className="flex items-center justify-between bg-gray-700/50 p-3 rounded-lg hover:bg-gray-700/70 transition-colors"
             >
               <button
-                onClick={() => onCitySelect(city)}
+                onClick={() => {onCitySelect(city); triggerRefresh(true)}}
                 className="flex items-center gap-2 text-white hover:text-blue-400 transition-colors"
               >
                 <Star className="w-4 h-4" />

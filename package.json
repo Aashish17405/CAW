@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "mongoose": "^8.16.0",
-    "sonner": "^2.0.5"
-  }
-}

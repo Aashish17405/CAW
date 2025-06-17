@@ -5,24 +5,6 @@ const Favorite = require("../models/Favorite");
 const router = express.Router();
 const API_KEY = process.env.API_KEY || "78ed8eb3a3019fb3af547bf878796675";
 
-// Mock data
-const mockCurrent = (city) => ({
-  city,
-  temperature: `${Math.floor(Math.random() * 10) + 25}°C`,
-  condition: "Sunny",
-});
-
-const mockForecast = (city) => ({
-  city,
-  forecast: Array.from({ length: 5 }, (_, i) => ({
-    day: `Day ${i + 1}`,
-    condition: "Partly Cloudy",
-    high: `${30 + i}°C`,
-    low: `${20 + i}°C`,
-  })),
-});
-
-// Input validation middleware
 const validateCityInput = (req, res, next) => {
   const city = req.params.city || req.body.city;
 
@@ -68,7 +50,6 @@ const validateCityInput = (req, res, next) => {
   next();
 };
 
-// Error handling middleware
 const handleApiError = (error, city) => {
   console.error(`Error fetching weather for ${city}:`, error.message);
 
@@ -120,30 +101,6 @@ const handleApiError = (error, city) => {
   };
 };
 
-// Validate API response
-const validateWeatherData = (data) => {
-  const requiredFields = ["main", "weather", "sys", "name"];
-  const missingFields = requiredFields.filter((field) => !data[field]);
-
-  if (missingFields.length > 0) {
-    throw new Error(
-      `Invalid weather data: missing required fields: ${missingFields.join(
-        ", "
-      )}`
-    );
-  }
-
-  if (!Array.isArray(data.weather) || data.weather.length === 0) {
-    throw new Error("Invalid weather data: weather array is empty or invalid");
-  }
-
-  if (!data.main.temp || typeof data.main.temp !== "number") {
-    throw new Error("Invalid weather data: temperature is missing or invalid");
-  }
-
-  return true;
-};
-
 // Routes
 router.get("/current/:city", validateCityInput, async (req, res) => {
   const city = req.validatedCity;
@@ -152,9 +109,6 @@ router.get("/current/:city", validateCityInput, async (req, res) => {
     const response = await axios.get(
       `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}`
     );
-
-    // Validate the response data
-    validateWeatherData(response.data);
 
     res.json(response.data);
   } catch (error) {
@@ -182,6 +136,24 @@ router.get("/forecast/:city", validateCityInput, async (req, res) => {
   } catch (error) {
     const errorResponse = handleApiError(error, city);
     res.status(errorResponse.status).json(errorResponse);
+  }
+});
+
+router.get("/livecast", async (req, res) => {
+  const { lat, lon} = req.query;
+
+  try {
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${API_KEY}`
+    );
+
+    res.json(response.data); 
+  } catch (error) {
+    console.error("Error fetching live weather data:", error);
+    res.status(500).json({
+      error: "Internal server error",
+      message: "Unable to fetch live weather data",
+    });
   }
 });
 

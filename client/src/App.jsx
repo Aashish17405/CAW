@@ -1,29 +1,84 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Sun, Moon, Download, MapPin } from "lucide-react";
+
 import {
-  Thermometer,
-  Wind,
-  Cloud,
-  Droplets,
-  Gauge,
-  Sun,
-  Moon,
-  ThermometerSun,
-  Eye,
-  CloudRain,
-  Download,
-} from "lucide-react";
+  RainAnimation,
+  SnowAnimation,
+  ThunderAnimation,
+  ClearSkyAnimation,
+  CloudAnimation,
+} from "./components/WeatherAnimations";
+
 import WeatherCard from "./components/WeatherCard";
+import Spinner from "./components/Spinner";
 import { getWeatherBackground } from "./utils/weatherUtils";
 import toast, { Toaster } from "react-hot-toast";
 import FavoritesList from "./components/FavoritesList";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
+import useRateLimit from "./hooks/useRateLimit";
+import LiveDashboard from "./components/LiveDashboard";
 
-// For Vite:
 const API = import.meta.env.VITE_API_URL;
+
+// Local storage utility functions
+const getStoredForecast = (city) => {
+  const storedData = localStorage.getItem(`forecast_${city.toLowerCase()}`);
+  if (!storedData) return null;
+
+  const { data, timestamp } = JSON.parse(storedData);
+  const now = new Date().getTime();
+
+  // Check if data is older than 24 hours
+  if (now - timestamp > 24 * 60 * 60 * 1000) {
+    localStorage.removeItem(`forecast_${city.toLowerCase()}`);
+    return null;
+  }
+
+  return data;
+};
+
+const storeForecast = (city, data) => {
+  const storageData = {
+    data,
+    timestamp: new Date().getTime(),
+  };
+  localStorage.setItem(
+    `forecast_${city.toLowerCase()}`,
+    JSON.stringify(storageData)
+  );
+};
+
+const getStoredWeather = (city) => {
+  const storedData = localStorage.getItem(`weather_${city.toLowerCase()}`);
+  if (!storedData) return null;
+
+  const { data, timestamp } = JSON.parse(storedData);
+  const now = new Date().getTime();
+
+  // Check if data is older than 24 hours
+  if (now - timestamp > 24 * 60 * 60 * 1000) {
+    localStorage.removeItem(`weather_${city.toLowerCase()}`);
+    return null;
+  }
+
+  return data;
+};
+
+const storeWeather = (city, data) => {
+  const storageData = {
+    data,
+    timestamp: new Date().getTime(),
+  };
+  localStorage.setItem(
+    `weather_${city.toLowerCase()}`,
+    JSON.stringify(storageData)
+  );
+};
 
 export default function App() {
   const [city, setCity] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [weather, setWeather] = useState(null);
   const [forecast, setForecast] = useState(null);
   const [forecastLoading, setForecastLoading] = useState(false);
@@ -31,7 +86,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [refreshFavorites, setRefreshFavorites] = useState(0);
   const [isCelsius, setIsCelsius] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
   const forecastRef = useRef(null);
+  const [refresh, setRefresh] = useState(false);
+  const { isLimited, checkRateLimit } = useRateLimit(2000); // 2 seconds between calls
 
   const formatTime = (timestamp) => {
     return new Date(timestamp * 1000).toLocaleTimeString([], {
@@ -70,6 +128,18 @@ export default function App() {
 
   const getWeather = async () => {
     if (!validateCity()) return;
+    if (!checkRateLimit()) {
+      toast.error("Please wait a moment before making another request");
+      return;
+    }
+
+    // Check local storage first
+    const storedWeather = getStoredWeather("weather_" + city);
+    if (storedWeather) {
+      setWeather(storedWeather);
+      toast.success(`Weather data for ${city} loaded from cache!`);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -80,6 +150,9 @@ export default function App() {
       if (!res.ok) {
         throw new Error(data.message || "Failed to fetch weather data");
       }
+
+      // Store the new weather data
+      storeWeather(city, data);
 
       setWeather(data);
       toast.success(`Weather data for ${data.name} loaded successfully!`);
@@ -95,6 +168,24 @@ export default function App() {
 
   const getForecast = async () => {
     if (!validateCity()) return;
+    if (!checkRateLimit()) {
+      toast.error("Please wait a moment before making another request");
+      return;
+    }
+
+    // Check local storage first
+    const storedForecast = getStoredForecast("forecast_" + city);
+    if (storedForecast) {
+      setForecast(storedForecast);
+      toast.success(`Forecast data for ${city} loaded from cache!`);
+      setTimeout(() => {
+        forecastRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
+      return;
+    }
 
     setForecastLoading(true);
     setError(null);
@@ -106,10 +197,11 @@ export default function App() {
         throw new Error(data.message || "Failed to fetch forecast data");
       }
 
+      // Store the new forecast data
+      storeForecast(city, data);
+
       setForecast(data);
       toast.success(`Forecast data for ${data.city.name} loaded successfully!`);
-
-      // Scroll to forecast after a short delay to ensure it's rendered
       setTimeout(() => {
         forecastRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -162,100 +254,139 @@ export default function App() {
     }
 
     try {
+      setExporting(true);
       const weatherElement = document.querySelector(".weather-report");
-      if (!weatherElement) {
-        throw new Error("Weather report element not found");
-      }
+      if (!weatherElement) throw new Error("Weather report element not found");
 
-      // Create a temporary container for the export
       const container = document.createElement("div");
-      container.style.position = "absolute";
-      container.style.left = "-9999px";
-      container.style.top = "0";
-      container.style.width = "800px"; // Set a fixed width for better quality
-      container.style.backgroundColor = "#1F2937";
-      container.style.padding = "20px";
-      container.style.color = "white";
-
-      // Clone the content
-      const contentClone = weatherElement.cloneNode(true);
-
-      // Remove gradient backgrounds
-      const gradientElements =
-        contentClone.getElementsByClassName("bg-gradient-to-br");
-      Array.from(gradientElements).forEach((el) => {
-        el.style.background = "#1F2937";
+      Object.assign(container.style, {
+        position: "absolute",
+        left: "-9999px",
+        top: "0",
+        width: "800px",
+        backgroundColor: "#1F2937",
+        padding: "20px",
+        color: "white",
+        height: `${weatherElement.offsetHeight + 100}px`,
       });
 
-      // Add the clone to the container
+      const contentClone = weatherElement.cloneNode(true);
+
+      contentClone.querySelectorAll("*").forEach((el) => {
+        el.style.visibility = "visible";
+        el.style.opacity = "1";
+      });
+
       container.appendChild(contentClone);
       document.body.appendChild(container);
 
-      // Wait for images to load
-      const images = container.getElementsByTagName("img");
-      await Promise.all(
-        Array.from(images).map(
-          (img) =>
-            new Promise((resolve) => {
-              if (img.complete) {
-                resolve();
-              } else {
-                img.onload = resolve;
-                img.onerror = resolve;
-              }
-            })
-        )
-      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
-        logging: true,
+        allowTaint: false,
+        foreignObjectRendering: false,
         backgroundColor: "#1F2937",
-        allowTaint: true,
-        foreignObjectRendering: true,
-        width: 800,
-        height: container.offsetHeight,
+        logging: true,
         onclone: (clonedDoc) => {
-          // Ensure all text is visible
-          const elements = clonedDoc.getElementsByTagName("*");
-          Array.from(elements).forEach((el) => {
-            if (window.getComputedStyle(el).color === "rgba(0, 0, 0, 0)") {
-              el.style.color = "white";
-            }
+          clonedDoc.querySelectorAll("*").forEach((el) => {
+            el.style.color = "#fff";
+            el.style.backgroundColor = "#1F2937";
           });
         },
       });
 
-      // Clean up
       document.body.removeChild(container);
 
-      const imgData = canvas.toDataURL("image/png", 1.0);
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgRatio = canvas.width / canvas.height;
+      const pageRatio = pageWidth / pageHeight;
 
-      const imgWidth = 210; // A4 width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let imgWidth, imgHeight, x, y;
 
-      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+      if (imgRatio > pageRatio) {
+        imgWidth = pageWidth - 20;
+        imgHeight = imgWidth / imgRatio;
+        x = 10;
+        y = (pageHeight - imgHeight) / 2;
+      } else {
+        imgHeight = pageHeight - 20;
+        imgWidth = imgHeight * imgRatio;
+        x = (pageWidth - imgWidth) / 2;
+        y = 10;
+      }
+
+      pdf.addImage(canvas, "PNG", x, y, imgWidth, imgHeight);
+
       pdf.save(
         `weather-report-${city}-${new Date().toISOString().split("T")[0]}.pdf`
       );
 
-      toast.success("Weather report exported successfully!");
+      toast.success("PDF exported successfully!");
     } catch (error) {
-      console.error("Error exporting to PDF:", error);
-      toast.error("Failed to export weather report");
+      console.error("Export failed:", error);
+      toast.error(`Export failed: ${error.message}`);
+    } finally {
+      setExporting(false);
     }
   };
 
-  // Get background class based on current weather
   const backgroundClass = weather?.weather?.[0]?.icon
     ? getWeatherBackground(weather.weather[0].icon)
     : "bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900";
+
+  const getTextColor = (icon) => {
+    const code = icon.slice(0, 2);
+    const isNight = icon.endsWith("n");
+
+    switch (code) {
+      case "01":
+      case "02":
+        return isNight
+          ? "text-yellow-200 drop-shadow-lg"
+          : "text-white drop-shadow-md";
+      case "03":
+      case "04":
+        return isNight
+          ? "text-white drop-shadow-lg"
+          : "text-gray-900 drop-shadow";
+      case "09":
+      case "10":
+        return isNight
+          ? "text-blue-100 drop-shadow-lg"
+          : "text-white drop-shadow";
+      case "11":
+        return "text-yellow-300 font-bold drop-shadow-lg";
+      case "13":
+        return isNight
+          ? "text-blue-100 drop-shadow-lg"
+          : "text-blue-900 drop-shadow";
+      case "50":
+        return isNight
+          ? "text-gray-200 drop-shadow-lg"
+          : "text-gray-900 drop-shadow";
+      default:
+        return "text-white drop-shadow";
+    }
+  };
+  const icon = weather?.weather?.[0]?.icon;
+  const textColorClass = icon ? getTextColor(icon) : "text-white";
+
+  const getWeatherAnimation = useMemo(() => {
+    if (!icon) return null;
+    if (icon.startsWith("09") || icon.startsWith("10"))
+      return <RainAnimation />;
+    if (icon.startsWith("13")) return <SnowAnimation />;
+    if (icon.startsWith("11")) return <ThunderAnimation />;
+    if (icon.startsWith("01") && icon.endsWith("d"))
+      return <ClearSkyAnimation />;
+    if (icon.startsWith("03") || icon.startsWith("04") || icon.startsWith("02"))
+      return <CloudAnimation />;
+    return null;
+  }, [icon]);
 
   const WeatherInfoCard = ({ title, icon: Icon, value, unit, subValue }) => (
     <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
@@ -273,14 +404,66 @@ export default function App() {
 
   const handleCitySelect = (selectedCity) => {
     setCity(selectedCity);
-    getWeather();
-    getForecast();
   };
+
+  const getWeatherInYourPlace = async () => {
+    if (!checkRateLimit()) {
+      toast.error("Please wait a moment before making another request");
+      return;
+    }
+
+    setLocationLoading(true);
+    setError(null);
+
+    try {
+      // Get user's current position
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+
+      const { latitude, longitude } = position.coords;
+
+      // Fetch weather data using coordinates
+      const res = await fetch(
+        `${API}/livecast?lat=${latitude}&lon=${longitude}`
+      );
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to fetch weather data");
+      }
+
+      // Store the weather data
+      storeWeather("current_location", data);
+      setWeather(data);
+      toast.success("Weather data for your location loaded successfully!");
+    } catch (error) {
+      console.error("Error getting location or weather:", error);
+      setWeather(null);
+      const errorMessage =
+        error.code === 1
+          ? "Location access denied. Please enable location services."
+          : error.message || "Failed to fetch weather data";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (refresh) {
+      getWeather();
+      getForecast();
+      setRefresh(false);
+    }
+  }, [refresh]);
 
   return (
     <div
       className={`min-h-screen w-full ${backgroundClass} text-white transition-colors duration-500`}
     >
+      {getWeatherAnimation}
       <Toaster
         position="top-right"
         toastOptions={{
@@ -304,20 +487,23 @@ export default function App() {
           },
         }}
       />
+
       <div className="w-full px-4 py-8">
         <header className="text-center mb-8 md:mb-12">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 md:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] px-4">
+          <h1
+            className={`${textColorClass} text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 md:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] px-4`}
+          >
             Weather Dashboard
           </h1>
           <div className="w-full max-w-4xl mx-auto px-4">
             <div className="flex flex-col gap-4">
-              {/* Input Section */}
               <div className="w-full flex justify-center">
                 <input
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="Enter city name"
+                  spellCheck={false}
                   className="w-full max-w-md p-3 rounded-lg border border-gray-700 bg-gray-800/50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
@@ -327,7 +513,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Buttons Section */}
               <div className="w-full flex flex-col sm:flex-row gap-3 items-center justify-center">
                 <div className="flex flex-wrap gap-2 justify-center">
                   <button
@@ -337,7 +522,7 @@ export default function App() {
                       loading ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    {loading ? "Loading..." : "Get Current"}
+                    {loading ? <Spinner /> : "Get Current"}
                   </button>
                   <button
                     onClick={getForecast}
@@ -346,7 +531,17 @@ export default function App() {
                       forecastLoading ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    {forecastLoading ? "Loading..." : "Get Forecast"}
+                    {forecastLoading ? <Spinner /> : "Get Forecast"}
+                  </button>
+                  <button
+                    onClick={getWeatherInYourPlace}
+                    disabled={locationLoading}
+                    className={`bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 flex items-center gap-2 ${
+                      locationLoading ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    <MapPin className="w-5 h-5" />
+                    {locationLoading ? <Spinner /> : "Weather in Your Place"}
                   </button>
                   <button
                     onClick={addFavorite}
@@ -360,7 +555,7 @@ export default function App() {
                       className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 flex items-center gap-2"
                     >
                       <Download className="w-5 h-5" />
-                      Export PDF
+                      {exporting ? "Exporting..." : "Export PDF"}
                     </button>
                   )}
                 </div>
@@ -376,21 +571,34 @@ export default function App() {
         </header>
 
         <main className="w-full max-w-6xl mx-auto space-y-8 px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-8 gap-8">
             <div className="lg:col-span-9">
               <div className="weather-report">
-                {weather && (
+                {weather && !weather.current && (
                   <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-gray-700/50">
                     <div className="flex justify-end mb-4">
-                      <button
-                        onClick={() => setIsCelsius(!isCelsius)}
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                      >
-                        {isCelsius ? "°C" : "°F"}
-                      </button>
+                      <div className="flex justify-end mb-4">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isCelsius}
+                            onChange={() => setIsCelsius(!isCelsius)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-14 h-8 bg-blue-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-400 transition-all duration-300"></div>
+                          <div className="absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 transform peer-checked:translate-x-6"></div>
+                          <span className="ml-3 text-sm text-white font-medium">
+                            {isCelsius ? "°C" : "°F"}
+                          </span>
+                        </label>
+                      </div>
                     </div>
                     <WeatherCard weather={weather} isCelsius={isCelsius} />
                   </div>
+                )}
+
+                {weather && weather.current && (
+                  <LiveDashboard data={weather} isCelsius={isCelsius} />
                 )}
 
                 {forecast && (
@@ -403,12 +611,21 @@ export default function App() {
                         5-Day Forecast - {forecast.city.name},{" "}
                         {forecast.city.country}
                       </h3>
-                      <button
-                        onClick={() => setIsCelsius(!isCelsius)}
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                      >
-                        {isCelsius ? "°C" : "°F"}
-                      </button>
+                      <div className="flex justify-end mb-4">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isCelsius}
+                            onChange={() => setIsCelsius(!isCelsius)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-14 h-8 bg-blue-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-400 transition-all duration-300"></div>
+                          <div className="absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 transform peer-checked:translate-x-6"></div>
+                          <span className="ml-3 text-sm text-white font-medium">
+                            {isCelsius ? "°C" : "°F"}
+                          </span>
+                        </label>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 text-gray-200 mb-6">
                       <Sun className="w-5 h-5" />
@@ -488,13 +705,13 @@ export default function App() {
                 )}
               </div>
             </div>
-
-            <div className="lg:col-span-3">
-              <FavoritesList
-                onCitySelect={handleCitySelect}
-                refreshTrigger={refreshFavorites}
-              />
-            </div>
+          </div>
+          <div className="lg:col-span-3">
+            <FavoritesList
+              onCitySelect={handleCitySelect}
+              refreshTrigger={refreshFavorites}
+              triggerRefresh={setRefresh}
+            />
           </div>
         </main>
       </div>
