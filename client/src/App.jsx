@@ -17,10 +17,7 @@ import toast, { Toaster } from "react-hot-toast";
 import FavoritesList from "./components/FavoritesList";
 
 // For Vite:
-const API = import.meta.env.VITE_BACKEND_URL;
-
-// If using Create React App, use:
-// const API = process.env.REACT_APP_BACKEND_URL;
+const API = import.meta.env.VITE_API_URL;
 
 export default function App() {
   const [city, setCity] = useState("");
@@ -187,29 +184,34 @@ export default function App() {
         }}
       />
       <div className="w-full px-4 py-8">
-        <header className="text-center mb-12">
-          <h1 className="text-5xl md:text-6xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600">
+        <header className="text-center mb-8 md:mb-12">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 md:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] px-4">
             Weather Dashboard
           </h1>
-          <div className="w-full max-w-2xl mx-auto">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Enter city name"
-                className="w-full sm:w-64 p-3 rounded-lg border border-gray-700 bg-gray-800/50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    getWeather();
-                  }
-                }}
-              />
-              <div className="flex flex-wrap gap-2 justify-center">
+          <div className="w-full max-w-4xl mx-auto px-4">
+            <div className="flex flex-col gap-4">
+              {/* Input Section */}
+              <div className="w-full flex justify-center">
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Enter city name"
+                  className="w-full max-w-md p-3 rounded-lg border border-gray-700 bg-gray-800/50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      getWeather();
+                    }
+                  }}
+                />
+              </div>
+              
+              {/* Buttons Section */}
+              <div className="w-full flex flex-col sm:flex-row gap-3 items-center justify-center">
                 <button
                   onClick={getWeather}
                   disabled={loading}
-                  className={`bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 ${
+                  className={`w-full sm:w-auto min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 ${
                     loading ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
@@ -218,7 +220,7 @@ export default function App() {
                 <button
                   onClick={getForecast}
                   disabled={forecastLoading}
-                  className={`bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 ${
+                  className={`w-full sm:w-auto min-w-[140px] bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 ${
                     forecastLoading ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
@@ -226,14 +228,15 @@ export default function App() {
                 </button>
                 <button
                   onClick={addFavorite}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105"
+                  className="w-full sm:w-auto min-w-[140px] bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105"
                 >
                   Add Favorite
                 </button>
               </div>
             </div>
+            
             {error && (
-              <div className="mt-4 p-3 bg-red-600/20 border border-red-500 rounded-lg text-red-300">
+              <div className="mt-4 p-3 bg-red-600/20 border border-red-500 rounded-lg text-red-300 max-w-md mx-auto">
                 {error}
               </div>
             )}
@@ -252,162 +255,78 @@ export default function App() {
               {forecast && (
                 <div className="mt-8 bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-gray-700/50">
                   <div className="mb-6">
-                    <h3 className="text-3xl font-semibold text-blue-300 mb-2">
+                    <h3 className="text-3xl font-semibold text-white mb-2">
                       5-Day Forecast - {forecast.city.name},{" "}
                       {forecast.city.country}
                     </h3>
-                    <div className="flex items-center gap-2 text-gray-400">
+                    <div className="flex items-center gap-2 text-gray-200">
                       <Sun className="w-5 h-5" />
                       <span>Sunrise: {formatTime(forecast.city.sunrise)}</span>
                       <Moon className="w-5 h-5 ml-4" />
                       <span>Sunset: {formatTime(forecast.city.sunset)}</span>
                     </div>
-                    <div className="mt-2 text-sm text-gray-400">
-                      <span>
-                        Population: {forecast.city.population?.toLocaleString()}
-                      </span>
-                      <span className="ml-4">
-                        Coordinates: {forecast.city.coord.lat},{" "}
-                        {forecast.city.coord.lon}
-                      </span>
-                    </div>
                   </div>
 
-                  <div className="space-y-6">
-                    {forecast &&
-                      forecast.length &&
-                      forecast.list
-                        .filter((item, index) => index % 8 === 0)
-                        .slice(0, 5)
-                        .map((item, index) => (
-                          <div
-                            key={index}
-                            className="bg-gray-700/50 backdrop-blur-sm p-6 rounded-lg hover:bg-gray-700/70 transition-colors duration-300"
-                          >
-                            <div className="flex justify-between items-center mb-4">
-                              <h4 className="text-xl font-semibold text-blue-300">
-                                {formatDate(item.dt)}
-                              </h4>
-                              <span className="text-gray-400">
-                                {item.dt_txt}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                    {forecast.list
+                      .filter((item, index) => index % 8 === 0)
+                      .slice(0, 5)
+                      .map((item, index) => (
+                        <div
+                          key={index}
+                          className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg hover:bg-gray-700/70 transition-colors duration-300"
+                        >
+                          <div className="text-center mb-4">
+                            <h4 className="text-xl font-semibold text-white">
+                              {formatDate(item.dt)}
+                            </h4>
+                            <p className="text-gray-300 text-sm">
+                              {item.dt_txt.split(" ")[1]}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col items-center mb-4">
+                            <img
+                              src={`http://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`}
+                              alt={item.weather[0].description}
+                              className="w-16 h-16"
+                            />
+                            <p className="text-lg font-medium text-white capitalize mt-2">
+                              {item.weather[0].main}
+                            </p>
+                            <p className="text-sm text-gray-300 capitalize">
+                              {item.weather[0].description}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Temperature</span>
+                              <span className="text-white font-medium">
+                                {Math.round(item.main.temp)}°C
                               </span>
                             </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                              <WeatherInfoCard
-                                title="Temperature"
-                                icon={Thermometer}
-                                value={Math.round(item.main.temp)}
-                                unit="°C"
-                                subValue={`Feels like: ${Math.round(
-                                  item.main.feels_like
-                                )}°C`}
-                              />
-
-                              <WeatherInfoCard
-                                title="Min/Max"
-                                icon={ThermometerSun}
-                                value={`${Math.round(
-                                  item.main.temp_min
-                                )}°/${Math.round(item.main.temp_max)}°`}
-                                subValue={`Temp KF: ${item.main.temp_kf.toFixed(
-                                  1
-                                )}°C`}
-                              />
-
-                              <WeatherInfoCard
-                                title="Humidity"
-                                icon={Droplets}
-                                value={item.main.humidity}
-                                unit="%"
-                              />
-
-                              <WeatherInfoCard
-                                title="Wind"
-                                icon={Wind}
-                                value={item.wind.speed.toFixed(1)}
-                                unit=" m/s"
-                                subValue={`Dir: ${item.wind.deg}° | Gust: ${
-                                  item.wind.gust?.toFixed(1) || "N/A"
-                                } m/s`}
-                              />
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Feels Like</span>
+                              <span className="text-white font-medium">
+                                {Math.round(item.main.feels_like)}°C
+                              </span>
                             </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                              <WeatherInfoCard
-                                title="Pressure"
-                                icon={Gauge}
-                                value={item.main.pressure}
-                                unit=" hPa"
-                                subValue={`Sea: ${item.main.sea_level} hPa`}
-                              />
-
-                              <WeatherInfoCard
-                                title="Ground Level"
-                                icon={Gauge}
-                                value={item.main.grnd_level}
-                                unit=" hPa"
-                              />
-
-                              <WeatherInfoCard
-                                title="Clouds"
-                                icon={Cloud}
-                                value={item.clouds.all}
-                                unit="%"
-                              />
-
-                              <WeatherInfoCard
-                                title="Visibility"
-                                icon={Eye}
-                                value={(item.visibility / 1000).toFixed(1)}
-                                unit=" km"
-                              />
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Humidity</span>
+                              <span className="text-white font-medium">
+                                {item.main.humidity}%
+                              </span>
                             </div>
-
-                            {(item.rain || item.pop > 0) && (
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                {item.rain && (
-                                  <WeatherInfoCard
-                                    title="Rain (3h)"
-                                    icon={CloudRain}
-                                    value={item.rain["3h"]?.toFixed(2) || 0}
-                                    unit=" mm"
-                                  />
-                                )}
-                                <WeatherInfoCard
-                                  title="Precipitation"
-                                  icon={Droplets}
-                                  value={Math.round(item.pop * 100)}
-                                  unit="%"
-                                />
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-2 bg-gray-600/50 p-3 rounded-lg">
-                              <img
-                                src={`http://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`}
-                                alt={item.weather[0].description}
-                                className="w-12 h-12"
-                              />
-                              <div>
-                                <p className="text-lg font-medium capitalize">
-                                  {item.weather[0].main}
-                                </p>
-                                <p className="text-sm text-gray-300 capitalize">
-                                  {item.weather[0].description}
-                                </p>
-                              </div>
-                              <div className="ml-auto text-right">
-                                <p className="text-sm text-gray-400">
-                                  Time Period
-                                </p>
-                                <p className="text-sm text-gray-300">
-                                  {item.sys.pod === "d" ? "Day" : "Night"}
-                                </p>
-                              </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Wind</span>
+                              <span className="text-white font-medium">
+                                {item.wind.speed.toFixed(1)} m/s
+                              </span>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}
