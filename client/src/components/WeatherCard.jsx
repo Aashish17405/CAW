@@ -1,12 +1,14 @@
 import {
+  Thermometer,
+  Wind,
   Cloud,
   Droplets,
-  Eye,
   Gauge,
-  Moon,
   Sun,
+  Moon,
   ThermometerSun,
-  Wind,
+  Eye,
+  CloudRain,
 } from "lucide-react";
 import { getWeatherIcon } from "../utils/weatherUtils";
 
@@ -31,7 +33,6 @@ export default function WeatherCard({ weather, isCelsius }) {
   const getTempUnit = () => (isCelsius ? "°C" : "°F");
 
   const formatTime = (timestamp) => {
-    if (!timestamp) return "N/A";
     return new Date(timestamp * 1000).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
@@ -41,106 +42,111 @@ export default function WeatherCard({ weather, isCelsius }) {
 
   const weatherIcon = getWeatherIcon(weather.weather[0].icon);
 
+  const WeatherInfoCard = ({ title, icon: Icon, value, unit, subValue }) => (
+    <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-5 h-5 text-blue-400" />
+        <h4 className="text-gray-400 text-sm">{title}</h4>
+      </div>
+      <p className="text-xl font-semibold">
+        {value}
+        {unit}
+      </p>
+      {subValue && <p className="text-sm text-gray-300">{subValue}</p>}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold text-blue-300">
-          {weather.name || "Unknown"}, {weather.sys?.country || "Unknown"}
-        </h2>
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="text-6xl">{weatherIcon}</div>
-          <div>
-            <p className="text-5xl font-bold">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="text-center md:text-left">
+          <h2 className="text-4xl font-bold text-white mb-2">
+            {weather.name}, {weather.sys.country}
+          </h2>
+          <p className="text-gray-300">
+            {new Date(weather.dt * 1000).toLocaleDateString([], {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-center">
+            <img
+              src={`http://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`}
+              alt={weather.weather[0].description}
+              className="w-20 h-20"
+            />
+            <p className="text-lg font-medium text-white capitalize">
+              {weather.weather[0].main}
+            </p>
+            <p className="text-sm text-gray-300 capitalize">
+              {weather.weather[0].description}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-5xl font-bold text-white">
               {convertTemp(weather.main.temp)}
               {getTempUnit()}
             </p>
-            <p className="text-gray-300 capitalize">
-              {weather.weather[0].description || "Unknown"}
+            <p className="text-gray-300">
+              Feels like {convertTemp(weather.main.feels_like)}
+              {getTempUnit()}
             </p>
           </div>
         </div>
-        <p className="text-gray-400">
-          Feels like {convertTemp(weather.main.feels_like)}
-          {getTempUnit()}
-        </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <ThermometerSun className="w-5 h-5 text-blue-400" />
-            <h4 className="text-gray-400 text-sm">Min/Max</h4>
-          </div>
-          <p className="text-xl font-semibold">
-            {convertTemp(weather.main.temp_min)}/
-            {convertTemp(weather.main.temp_max)}
-            {getTempUnit()}
-          </p>
-        </div>
-
-        <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Droplets className="w-5 h-5 text-blue-400" />
-            <h4 className="text-gray-400 text-sm">Humidity</h4>
-          </div>
-          <p className="text-xl font-semibold">
-            {weather.main.humidity || "N/A"}%
-          </p>
-        </div>
-
-        <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Wind className="w-5 h-5 text-blue-400" />
-            <h4 className="text-gray-400 text-sm">Wind Speed</h4>
-          </div>
-          <p className="text-xl font-semibold">
-            {weather.wind?.speed || "N/A"} m/s
-          </p>
-        </div>
-
-        <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Gauge className="w-5 h-5 text-blue-400" />
-            <h4 className="text-gray-400 text-sm">Pressure</h4>
-          </div>
-          <p className="text-xl font-semibold">
-            {weather.main.pressure || "N/A"} hPa
-          </p>
-        </div>
-
-        <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Cloud className="w-5 h-5 text-blue-400" />
-            <h4 className="text-gray-400 text-sm">Clouds</h4>
-          </div>
-          <p className="text-xl font-semibold">
-            {weather.clouds?.all || "N/A"}%
-          </p>
-        </div>
-
-        <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Eye className="w-5 h-5 text-blue-400" />
-            <h4 className="text-gray-400 text-sm">Visibility</h4>
-          </div>
-          <p className="text-xl font-semibold">
-            {weather.visibility
-              ? (weather.visibility / 1000).toFixed(1)
-              : "N/A"}{" "}
-            km
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-        <div className="flex items-center gap-2">
-          <Sun className="w-5 h-5 text-yellow-400" />
-          <span>Sunrise: {formatTime(weather.sys?.sunrise)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Moon className="w-5 h-5 text-blue-300" />
-          <span>Sunset: {formatTime(weather.sys?.sunset)}</span>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <WeatherInfoCard
+          title="Temperature"
+          icon={Thermometer}
+          value={`${convertTemp(weather.main.temp_min)} - ${convertTemp(
+            weather.main.temp_max
+          )}`}
+          unit={getTempUnit()}
+        />
+        <WeatherInfoCard
+          title="Humidity"
+          icon={Droplets}
+          value={weather.main.humidity}
+          unit="%"
+        />
+        <WeatherInfoCard
+          title="Wind"
+          icon={Wind}
+          value={weather.wind.speed.toFixed(1)}
+          unit=" m/s"
+        />
+        <WeatherInfoCard
+          title="Pressure"
+          icon={Gauge}
+          value={weather.main.pressure}
+          unit=" hPa"
+        />
+        <WeatherInfoCard
+          title="Visibility"
+          icon={Eye}
+          value={(weather.visibility / 1000).toFixed(1)}
+          unit=" km"
+        />
+        <WeatherInfoCard
+          title="Clouds"
+          icon={Cloud}
+          value={weather.clouds.all}
+          unit="%"
+        />
+        <WeatherInfoCard
+          title="Sunrise"
+          icon={Sun}
+          value={formatTime(weather.sys.sunrise)}
+        />
+        <WeatherInfoCard
+          title="Sunset"
+          icon={Moon}
+          value={formatTime(weather.sys.sunset)}
+        />
       </div>
     </div>
   );

@@ -1,11 +1,9 @@
 const express = require("express");
-const fs = require("fs");
 const axios = require("axios");
+const Favorite = require("../models/Favorite");
 
 const router = express.Router();
-const favoritesFile = "./db.json";
-const API_KEY = process.env.API_KEY;
-// const API_KEY = "78ed8eb3a3019fb3af547bf878796675";
+const API_KEY = process.env.API_KEY || "78ed8eb3a3019fb3af547bf878796675";
 
 // Mock data
 const mockCurrent = (city) => ({
@@ -58,7 +56,6 @@ const validateCityInput = (req, res, next) => {
     });
   }
 
-  // Sanitize city name - only allow letters, spaces, hyphens, and apostrophes
   if (!/^[a-zA-Z\s\-']+$/.test(trimmedCity)) {
     return res.status(400).json({
       error: "Invalid city name format",
@@ -188,65 +185,35 @@ router.get("/forecast/:city", validateCityInput, async (req, res) => {
   }
 });
 
-// Favorites handling
-const readFavoritesFile = () => {
-  try {
-    const fileContent = fs.readFileSync(favoritesFile, "utf8");
-    const data = JSON.parse(fileContent);
-    return data.favorites || [];
-  } catch (error) {
-    console.error("Error reading favorites file:", error.message);
-    return [];
-  }
-};
+// Favorites routes
+router.post("/favorites", validateCityInput, async (req, res) => {
+  const city = req.validatedCity;
 
-const writeFavoritesFile = (favorites) => {
   try {
-    // Ensure the file exists
-    if (!fs.existsSync(favoritesFile)) {
-      fs.writeFileSync(
-        favoritesFile,
-        JSON.stringify({ favorites: [] }, null, 2)
-      );
+    // Check if city already exists
+    const existingFavorite = await Favorite.findOne({
+      city: city.toLowerCase(),
+    });
+    if (existingFavorite) {
+      return res.status(409).json({
+        error: "City already exists",
+        message: `"${city}" is already in your favorites`,
+      });
     }
 
-    // Try to write the file
-    fs.writeFileSync(favoritesFile, JSON.stringify({ favorites }, null, 2));
-    return true;
-  } catch (error) {
-    console.error("Error writing to favorites file:", error.message);
-    // Log more details about the error
-    console.error("Error details:", {
-      code: error.code,
-      path: favoritesFile,
-      message: error.message,
-    });
-    return false;
-  }
-};
+    // Add city to favorites
+    const favorite = new Favorite({ city: city.toLowerCase() });
+    await favorite.save();
 
-router.post("/favorites", validateCityInput, (req, res) => {
-  const city = req.validatedCity;
-  const favorites = readFavoritesFile();
+    const totalFavorites = await Favorite.countDocuments();
 
-  // Check if city already exists (case-insensitive)
-  if (favorites.some((fav) => fav.toLowerCase() === city.toLowerCase())) {
-    return res.status(409).json({
-      error: "City already exists",
-      message: `"${city}" is already in your favorites`,
-    });
-  }
-
-  // Add city to favorites
-  favorites.push(city);
-
-  if (writeFavoritesFile(favorites)) {
     res.json({
       message: "City added successfully",
       city,
-      totalFavorites: favorites.length,
+      totalFavorites,
     });
-  } else {
+  } catch (error) {
+    console.error("Error adding favorite:", error);
     res.status(500).json({
       error: "Failed to save favorite",
       message: "Unable to save the city to favorites. Please try again.",
@@ -254,38 +221,46 @@ router.post("/favorites", validateCityInput, (req, res) => {
   }
 });
 
-router.get("/favorites", (req, res) => {
-  const favorites = readFavoritesFile();
-  res.json({
-    favorites,
-    count: favorites.length,
-  });
-});
-
-router.delete("/favorites/:city", validateCityInput, (req, res) => {
-  const city = req.validatedCity;
-  const favorites = readFavoritesFile();
-
-  const cityIndex = favorites.findIndex(
-    (fav) => fav.toLowerCase() === city.toLowerCase()
-  );
-
-  if (cityIndex === -1) {
-    return res.status(404).json({
-      error: "City not found",
-      message: `"${city}" is not in your favorites`,
+router.get("/favorites", async (req, res) => {
+  try {
+    const favorites = await Favorite.find().sort({ createdAt: -1 });
+    res.json({
+      favorites: favorites.map((fav) => fav.city),
+      count: favorites.length,
+    });
+  } catch (error) {
+    console.error("Error fetching favorites:", error);
+    res.status(500).json({
+      error: "Failed to fetch favorites",
+      message: "Unable to fetch favorites. Please try again.",
     });
   }
+});
 
-  favorites.splice(cityIndex, 1);
+router.delete("/favorites/:city", validateCityInput, async (req, res) => {
+  const city = req.validatedCity;
 
-  if (writeFavoritesFile(favorites)) {
+  try {
+    const result = await Favorite.findOneAndDelete({
+      city: city.toLowerCase(),
+    });
+
+    if (!result) {
+      return res.status(404).json({
+        error: "City not found",
+        message: `"${city}" is not in your favorites`,
+      });
+    }
+
+    const totalFavorites = await Favorite.countDocuments();
+
     res.json({
       message: "City removed successfully",
       city,
-      totalFavorites: favorites.length,
+      totalFavorites,
     });
-  } else {
+  } catch (error) {
+    console.error("Error removing favorite:", error);
     res.status(500).json({
       error: "Failed to remove favorite",
       message: "Unable to remove the city from favorites. Please try again.",

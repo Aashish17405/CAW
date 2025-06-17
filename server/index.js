@@ -1,22 +1,17 @@
-require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 const weatherRoutes = require("./routes/weather.js");
-const fs = require("fs");
+require("dotenv").config();
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
-// Initialize db.json if it doesn't exist
-const dbPath = "./db.json";
-if (!fs.existsSync(dbPath)) {
-  try {
-    fs.writeFileSync(dbPath, JSON.stringify({ favorites: [] }, null, 2));
-    console.log("Created db.json file");
-  } catch (error) {
-    console.error("Error creating db.json:", error.message);
-  }
-}
+// MongoDB connection
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 app.use(cors());
 app.use(express.json());
