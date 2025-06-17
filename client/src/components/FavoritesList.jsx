@@ -1,64 +1,117 @@
-import { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { RefreshCw, Trash2 } from "lucide-react";
 
-const API = "http://localhost:5000/weather";
-
-export default function FavoritesList() {
+export default function FavoritesList({ onCitySelect, refreshTrigger }) {
   const [favorites, setFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const fetchFavorites = useCallback(async () => {
+  const fetchFavorites = async () => {
     try {
-      const res = await axios.get(`${API}/favorites`);
-      setFavorites(res.data.favorites);
+      setLoading(true);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/favorites`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to fetch favorites");
+      }
+
+      setFavorites(data);
     } catch (error) {
       console.error("Error fetching favorites:", error);
-      setFavorites([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
-
-  const removeFavorite = async (cityToRemove) => {
-    try {
-      await axios.delete(`${API}/favorites/${cityToRemove}`);
-      alert(`${cityToRemove} removed from favorites!`);
-      fetchFavorites(); // Refresh the list after removal
-    } catch (error) {
-      console.error("Error removing favorite:", error);
-      alert("Failed to remove favorite. Please try again.");
+      toast.error(error.message || "Failed to fetch favorites");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const removeFavorite = async (city) => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/favorites/${city}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to remove from favorites");
+      }
+
+      toast.success(`${city} removed from favorites`);
+      fetchFavorites(); // Refresh the list
+    } catch (error) {
+      console.error("Error removing favorite:", error);
+      toast.error(error.message || "Failed to remove from favorites");
+    }
+  };
+
+  useEffect(() => {
+    fetchFavorites();
+  }, [refreshTrigger]); // Add refreshTrigger to dependency array
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-gray-700/50">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-2xl font-semibold text-blue-300">
+            Favorite Cities
+          </h3>
+          <button
+            onClick={fetchFavorites}
+            className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+            title="Refresh favorites"
+          >
+            <RefreshCw className="w-5 h-5 text-blue-300" />
+          </button>
+        </div>
+        <div className="animate-pulse space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 bg-gray-700/50 rounded-lg"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-full">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-3xl font-semibold text-blue-300">
+    <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-gray-700/50">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-2xl font-semibold text-blue-300">
           Favorite Cities
         </h3>
         <button
           onClick={fetchFavorites}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transform transition duration-300 ease-in-out hover:scale-105"
+          className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+          title="Refresh favorites"
         >
-          Refresh
+          <RefreshCw className="w-5 h-5 text-blue-300" />
         </button>
       </div>
+
       {favorites.length === 0 ? (
-        <p className="text-gray-400">No favorites added yet.</p>
+        <p className="text-gray-400">No favorite cities yet</p>
       ) : (
-        <ul className="space-y-3">
-          {favorites.map((c, i) => (
+        <ul className="space-y-2">
+          {favorites.map((city) => (
             <li
-              key={i}
-              className="bg-gray-700 p-3 rounded-md flex justify-between items-center text-lg text-white"
+              key={city}
+              className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors"
             >
-              <span>{c}</span>
               <button
-                onClick={() => removeFavorite(c)}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg text-sm transition duration-300 ease-in-out hover:scale-105"
+                onClick={() => onCitySelect(city)}
+                className="flex-1 text-left hover:text-blue-300 transition-colors"
               >
-                Remove
+                {city}
+              </button>
+              <button
+                onClick={() => removeFavorite(city)}
+                className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
+                title="Remove from favorites"
+              >
+                <Trash2 className="w-4 h-4 text-red-400" />
               </button>
             </li>
           ))}
