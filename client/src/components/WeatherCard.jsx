@@ -13,7 +13,6 @@ import {
 import { getWeatherIcon } from "../utils/weatherUtils";
 
 export default function WeatherCard({ weather, isCelsius }) {
-  // Validate weather data
   if (!weather || !weather.main || !weather.weather || !weather.weather[0]) {
     return (
       <div className="text-center p-6 bg-red-500/20 border border-red-500 rounded-lg">

@@ -29,7 +29,6 @@ const LiveDashboard = ({ data, isCelsius }) => {
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Current Weather */}
         <div className="bg-gray-700/50 p-4 rounded-lg">
           <h3 className="text-lg font-semibold mb-2 text-white">
             Current Weather
@@ -52,7 +51,6 @@ const LiveDashboard = ({ data, isCelsius }) => {
           </div>
         </div>
 
-        {/* Feels Like */}
         <div className="bg-gray-700/50 p-4 rounded-lg">
           <h3 className="text-lg font-semibold mb-2 text-white">Feels Like</h3>
           <div className="flex items-center gap-2">
@@ -64,7 +62,6 @@ const LiveDashboard = ({ data, isCelsius }) => {
           </div>
         </div>
 
-        {/* Humidity */}
         <div className="bg-gray-700/50 p-4 rounded-lg">
           <h3 className="text-lg font-semibold mb-2 text-white">Humidity</h3>
           <div className="flex items-center gap-2">
@@ -75,7 +72,6 @@ const LiveDashboard = ({ data, isCelsius }) => {
           </div>
         </div>
 
-        {/* Wind Speed */}
         <div className="bg-gray-700/50 p-4 rounded-lg">
           <h3 className="text-lg font-semibold mb-2 text-white">Wind Speed</h3>
           <div className="flex items-center gap-2">
@@ -86,7 +82,6 @@ const LiveDashboard = ({ data, isCelsius }) => {
           </div>
         </div>
 
-        {/* Cloud Coverage */}
         <div className="bg-gray-700/50 p-4 rounded-lg">
           <h3 className="text-lg font-semibold mb-2 text-white">
             Cloud Coverage
@@ -99,7 +94,6 @@ const LiveDashboard = ({ data, isCelsius }) => {
           </div>
         </div>
 
-        {/* UV Index */}
         <div className="bg-gray-700/50 p-4 rounded-lg">
           <h3 className="text-lg font-semibold mb-2 text-white">UV Index</h3>
           <div className="flex items-center gap-2">
@@ -109,7 +103,6 @@ const LiveDashboard = ({ data, isCelsius }) => {
         </div>
       </div>
 
-      {/* Hourly Forecast */}
       <div className="mt-6">
         <h3 className="text-xl font-semibold mb-4 text-white">
           Hourly Forecast

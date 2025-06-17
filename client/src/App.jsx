@@ -18,24 +18,36 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas-pro";
 import useRateLimit from "./hooks/useRateLimit";
 import LiveDashboard from "./components/LiveDashboard";
+import { Analytics } from "@vercel/analytics/react";
 
 const API = import.meta.env.VITE_API_URL;
 
-// Local storage utility functions
+// Caching through local storage
 const getStoredForecast = (city) => {
   const storedData = localStorage.getItem(`forecast_${city.toLowerCase()}`);
   if (!storedData) return null;
 
-  const { data, timestamp } = JSON.parse(storedData);
-  const now = new Date().getTime();
+  try {
+    const { data, timestamp } = JSON.parse(storedData);
+    const now = new Date().getTime();
 
-  // Check if data is older than 24 hours
-  if (now - timestamp > 24 * 60 * 60 * 1000) {
+    // Check if data is older than 24 hours
+    if (now - timestamp > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(`forecast_${city.toLowerCase()}`);
+      return null;
+    }
+
+    if (!data || !data.list || !Array.isArray(data.list)) {
+      localStorage.removeItem(`forecast_${city.toLowerCase()}`);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error parsing stored forecast data:", error);
     localStorage.removeItem(`forecast_${city.toLowerCase()}`);
     return null;
   }
-
-  return data;
 };
 
 const storeForecast = (city, data) => {
@@ -53,16 +65,26 @@ const getStoredWeather = (city) => {
   const storedData = localStorage.getItem(`weather_${city.toLowerCase()}`);
   if (!storedData) return null;
 
-  const { data, timestamp } = JSON.parse(storedData);
-  const now = new Date().getTime();
+  try {
+    const { data, timestamp } = JSON.parse(storedData);
+    const now = new Date().getTime();
 
-  // Check if data is older than 24 hours
-  if (now - timestamp > 24 * 60 * 60 * 1000) {
+    if (now - timestamp > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(`weather_${city.toLowerCase()}`);
+      return null;
+    }
+
+    if (!data || !data.weather || !Array.isArray(data.weather)) {
+      localStorage.removeItem(`weather_${city.toLowerCase()}`);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error parsing stored weather data:", error);
     localStorage.removeItem(`weather_${city.toLowerCase()}`);
     return null;
   }
-
-  return data;
 };
 
 const storeWeather = (city, data) => {
@@ -89,7 +111,7 @@ export default function App() {
   const [locationLoading, setLocationLoading] = useState(false);
   const forecastRef = useRef(null);
   const [refresh, setRefresh] = useState(false);
-  const { isLimited, checkRateLimit } = useRateLimit(2000); // 2 seconds between calls
+  const { isLimited, checkRateLimit } = useRateLimit(2000);
 
   const formatTime = (timestamp) => {
     return new Date(timestamp * 1000).toLocaleTimeString([], {
@@ -133,8 +155,16 @@ export default function App() {
       return;
     }
 
-    // Check local storage first
-    const storedWeather = getStoredWeather("weather_" + city);
+    if (
+      forecast &&
+      forecast.city &&
+      forecast.city.name.toLowerCase() !== city.toLowerCase()
+    ) {
+      setForecast(null);
+    }
+
+    // Check the cache storage first
+    const storedWeather = getStoredWeather(city);
     if (storedWeather) {
       setWeather(storedWeather);
       toast.success(`Weather data for ${city} loaded from cache!`);
@@ -151,9 +181,7 @@ export default function App() {
         throw new Error(data.message || "Failed to fetch weather data");
       }
 
-      // Store the new weather data
       storeWeather(city, data);
-
       setWeather(data);
       toast.success(`Weather data for ${data.name} loaded successfully!`);
     } catch (error) {
@@ -173,8 +201,15 @@ export default function App() {
       return;
     }
 
-    // Check local storage first
-    const storedForecast = getStoredForecast("forecast_" + city);
+    if (
+      weather &&
+      weather.name &&
+      weather.name.toLowerCase() !== city.toLowerCase()
+    ) {
+      setWeather(null);
+    }
+
+    const storedForecast = getStoredForecast(city);
     if (storedForecast) {
       setForecast(storedForecast);
       toast.success(`Forecast data for ${city} loaded from cache!`);
@@ -197,9 +232,7 @@ export default function App() {
         throw new Error(data.message || "Failed to fetch forecast data");
       }
 
-      // Store the new forecast data
       storeForecast(city, data);
-
       setForecast(data);
       toast.success(`Forecast data for ${data.city.name} loaded successfully!`);
       setTimeout(() => {
@@ -388,20 +421,6 @@ export default function App() {
     return null;
   }, [icon]);
 
-  const WeatherInfoCard = ({ title, icon: Icon, value, unit, subValue }) => (
-    <div className="bg-gray-700/50 backdrop-blur-sm p-4 rounded-lg">
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="w-5 h-5 text-blue-400" />
-        <h4 className="text-gray-400 text-sm">{title}</h4>
-      </div>
-      <p className="text-xl font-semibold">
-        {value}
-        {unit}
-      </p>
-      {subValue && <p className="text-sm text-gray-300">{subValue}</p>}
-    </div>
-  );
-
   const handleCitySelect = (selectedCity) => {
     setCity(selectedCity);
   };
@@ -412,18 +431,23 @@ export default function App() {
       return;
     }
 
+    const storedWeather = getStoredWeather("current_location");
+    if (storedWeather) {
+      setWeather(storedWeather);
+      toast.success("Weather data loaded from cache!");
+      return;
+    }
+
     setLocationLoading(true);
     setError(null);
 
     try {
-      // Get user's current position
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject);
       });
 
       const { latitude, longitude } = position.coords;
 
-      // Fetch weather data using coordinates
       const res = await fetch(
         `${API}/livecast?lat=${latitude}&lon=${longitude}`
       );
@@ -433,7 +457,6 @@ export default function App() {
         throw new Error(data.message || "Failed to fetch weather data");
       }
 
-      // Store the weather data
       storeWeather("current_location", data);
       setWeather(data);
       toast.success("Weather data for your location loaded successfully!");
@@ -463,6 +486,7 @@ export default function App() {
     <div
       className={`min-h-screen w-full ${backgroundClass} text-white transition-colors duration-500`}
     >
+      <Analytics />
       {getWeatherAnimation}
       <Toaster
         position="top-right"

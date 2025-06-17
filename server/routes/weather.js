@@ -125,7 +125,6 @@ router.get("/forecast/:city", validateCityInput, async (req, res) => {
       `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}`
     );
 
-    // Validate forecast data
     if (!response.data.list || !Array.isArray(response.data.list)) {
       throw new Error(
         "Invalid forecast data: missing or invalid forecast list"
@@ -157,12 +156,10 @@ router.get("/livecast", async (req, res) => {
   }
 });
 
-// Favorites routes
 router.post("/favorites", validateCityInput, async (req, res) => {
   const city = req.validatedCity;
 
   try {
-    // Check if city already exists
     const existingFavorite = await Favorite.findOne({
       city: city.toLowerCase(),
     });
@@ -173,7 +170,6 @@ router.post("/favorites", validateCityInput, async (req, res) => {
       });
     }
 
-    // Add city to favorites
     const favorite = new Favorite({ city: city.toLowerCase() });
     await favorite.save();
 

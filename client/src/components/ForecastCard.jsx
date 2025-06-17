@@ -3,7 +3,6 @@ import { Cloud, Wind, Thermometer, Droplets } from "lucide-react";
 export default function ForecastCard({ forecast }) {
   const { main, weather, wind, dt_txt } = forecast;
 
-  // Convert timestamp to readable date
   const date = new Date(dt_txt);
   const formattedDate = date.toLocaleDateString("en-US", {
     weekday: "short",
