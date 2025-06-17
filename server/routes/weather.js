@@ -24,262 +24,256 @@ const mockForecast = (city) => ({
   })),
 });
 
+// Input validation middleware
+const validateCityInput = (req, res, next) => {
+  const city = req.params.city || req.body.city;
+
+  if (!city) {
+    return res.status(400).json({
+      error: "Missing city parameter",
+      message: "Please provide a city name",
+    });
+  }
+
+  if (typeof city !== "string") {
+    return res.status(400).json({
+      error: "Invalid city parameter",
+      message: "City name must be a string",
+    });
+  }
+
+  const trimmedCity = city.trim();
+
+  if (trimmedCity.length === 0) {
+    return res.status(400).json({
+      error: "Empty city name",
+      message: "Please provide a valid city name",
+    });
+  }
+
+  if (trimmedCity.length > 100) {
+    return res.status(400).json({
+      error: "City name too long",
+      message: "City name must be less than 100 characters",
+    });
+  }
+
+  // Sanitize city name - only allow letters, spaces, hyphens, and apostrophes
+  if (!/^[a-zA-Z\s\-']+$/.test(trimmedCity)) {
+    return res.status(400).json({
+      error: "Invalid city name format",
+      message:
+        "City name can only contain letters, spaces, hyphens, and apostrophes",
+    });
+  }
+
+  req.validatedCity = trimmedCity;
+  next();
+};
+
+// Error handling middleware
+const handleApiError = (error, city) => {
+  console.error(`Error fetching weather for ${city}:`, error.message);
+
+  if (error.response) {
+    const status = error.response.status;
+    switch (status) {
+      case 404:
+        return {
+          status: 404,
+          error: "City not found",
+          message: `Weather data for ${city} is not available. Please check the city name.`,
+        };
+      case 401:
+        return {
+          status: 500,
+          error: "API authentication failed",
+          message:
+            "Weather service is temporarily unavailable. Please try again later.",
+        };
+      case 429:
+        return {
+          status: 429,
+          error: "Rate limit exceeded",
+          message: "Too many requests. Please try again later.",
+        };
+      default:
+        return {
+          status: 500,
+          error: "Weather service error",
+          message:
+            "Unable to fetch weather data at this time. Please try again later.",
+        };
+    }
+  }
+
+  if (error.request) {
+    return {
+      status: 503,
+      error: "Network error",
+      message:
+        "Unable to connect to weather service. Please check your internet connection.",
+    };
+  }
+
+  return {
+    status: 500,
+    error: "Internal server error",
+    message: "An unexpected error occurred. Please try again later.",
+  };
+};
+
+// Validate API response
+const validateWeatherData = (data) => {
+  const requiredFields = ["main", "weather", "sys", "name"];
+  const missingFields = requiredFields.filter((field) => !data[field]);
+
+  if (missingFields.length > 0) {
+    throw new Error(
+      `Invalid weather data: missing required fields: ${missingFields.join(
+        ", "
+      )}`
+    );
+  }
+
+  if (!Array.isArray(data.weather) || data.weather.length === 0) {
+    throw new Error("Invalid weather data: weather array is empty or invalid");
+  }
+
+  if (!data.main.temp || typeof data.main.temp !== "number") {
+    throw new Error("Invalid weather data: temperature is missing or invalid");
+  }
+
+  return true;
+};
+
 // Routes
-router.get("/current/:city", async (req, res) => {
-  const { city } = req.params;
-
-  // Input validation
-  if (!city || city.trim().length === 0) {
-    return res.status(400).json({
-      error: "City name is required",
-      message: "Please provide a valid city name",
-    });
-  }
+router.get("/current/:city", validateCityInput, async (req, res) => {
+  const city = req.validatedCity;
 
   try {
     const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/weather?q=${city.trim()}&appid=${API_KEY}&units=metric`
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}`
     );
+
+    // Validate the response data
+    validateWeatherData(response.data);
+
     res.json(response.data);
   } catch (error) {
-    console.error(`Error fetching current weather for ${city}:`, error.message);
-
-    if (error.response) {
-      // API responded with error status
-      const status = error.response.status;
-      if (status === 404) {
-        return res.status(404).json({
-          error: "City not found",
-          message: `Weather data for "${city}" is not available. Please check the city name.`,
-        });
-      } else if (status === 401) {
-        return res.status(500).json({
-          error: "API authentication failed",
-          message: "Weather service is temporarily unavailable",
-        });
-      } else if (status === 429) {
-        return res.status(429).json({
-          error: "Rate limit exceeded",
-          message: "Too many requests. Please try again later.",
-        });
-      } else {
-        return res.status(500).json({
-          error: "Weather service error",
-          message: "Unable to fetch weather data at this time",
-        });
-      }
-    } else if (error.request) {
-      // Network error
-      return res.status(503).json({
-        error: "Network error",
-        message:
-          "Unable to connect to weather service. Please try again later.",
-      });
-    } else {
-      // Other error
-      return res.status(500).json({
-        error: "Internal server error",
-        message: "An unexpected error occurred while fetching weather data",
-      });
-    }
+    const errorResponse = handleApiError(error, city);
+    res.status(errorResponse.status).json(errorResponse);
   }
 });
 
-router.get("/forecast/:city", async (req, res) => {
-  const { city } = req.params;
-
-  // Input validation
-  if (!city || city.trim().length === 0) {
-    return res.status(400).json({
-      error: "City name is required",
-      message: "Please provide a valid city name",
-    });
-  }
+router.get("/forecast/:city", validateCityInput, async (req, res) => {
+  const city = req.validatedCity;
 
   try {
     const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/forecast?q=${city.trim()}&appid=${API_KEY}&units=metric`
+      `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}`
     );
+
+    // Validate forecast data
+    if (!response.data.list || !Array.isArray(response.data.list)) {
+      throw new Error(
+        "Invalid forecast data: missing or invalid forecast list"
+      );
+    }
+
     res.json(response.data);
   } catch (error) {
-    console.error(`Error fetching forecast for ${city}:`, error.message);
-
-    if (error.response) {
-      // API responded with error status
-      const status = error.response.status;
-      if (status === 404) {
-        return res.status(404).json({
-          error: "City not found",
-          message: `Forecast data for "${city}" is not available. Please check the city name.`,
-        });
-      } else if (status === 401) {
-        return res.status(500).json({
-          error: "API authentication failed",
-          message: "Weather service is temporarily unavailable",
-        });
-      } else if (status === 429) {
-        return res.status(429).json({
-          error: "Rate limit exceeded",
-          message: "Too many requests. Please try again later.",
-        });
-      } else {
-        return res.status(500).json({
-          error: "Weather service error",
-          message: "Unable to fetch forecast data at this time",
-        });
-      }
-    } else if (error.request) {
-      // Network error
-      return res.status(503).json({
-        error: "Network error",
-        message:
-          "Unable to connect to weather service. Please try again later.",
-      });
-    } else {
-      // Other error
-      return res.status(500).json({
-        error: "Internal server error",
-        message: "An unexpected error occurred while fetching forecast data",
-      });
-    }
+    const errorResponse = handleApiError(error, city);
+    res.status(errorResponse.status).json(errorResponse);
   }
 });
 
-router.post("/favorites", (req, res) => {
+// Favorites handling
+const readFavoritesFile = () => {
   try {
-    const { city } = req.body;
+    const fileContent = fs.readFileSync(favoritesFile, "utf8");
+    const data = JSON.parse(fileContent);
+    return data.favorites || [];
+  } catch (error) {
+    console.error("Error reading favorites file:", error.message);
+    return [];
+  }
+};
 
-    // Input validation
-    if (!city || typeof city !== "string" || city.trim().length === 0) {
-      return res.status(400).json({
-        error: "Invalid city name",
-        message: "Please provide a valid city name",
-      });
-    }
+const writeFavoritesFile = (favorites) => {
+  try {
+    fs.writeFileSync(favoritesFile, JSON.stringify({ favorites }, null, 2));
+    return true;
+  } catch (error) {
+    console.error("Error writing to favorites file:", error.message);
+    return false;
+  }
+};
 
-    const trimmedCity = city.trim();
+router.post("/favorites", validateCityInput, (req, res) => {
+  const city = req.validatedCity;
+  const favorites = readFavoritesFile();
 
-    // Check if city name is reasonable length
-    if (trimmedCity.length > 100) {
-      return res.status(400).json({
-        error: "City name too long",
-        message: "City name must be less than 100 characters",
-      });
-    }
+  // Check if city already exists (case-insensitive)
+  if (favorites.some((fav) => fav.toLowerCase() === city.toLowerCase())) {
+    return res.status(409).json({
+      error: "City already exists",
+      message: `"${city}" is already in your favorites`,
+    });
+  }
 
-    // Read favorites file
-    let data;
-    try {
-      const fileContent = fs.readFileSync(favoritesFile, "utf8");
-      data = JSON.parse(fileContent);
-    } catch (fileError) {
-      console.error("Error reading favorites file:", fileError.message);
-      // Initialize with empty favorites if file doesn't exist or is corrupted
-      data = { favorites: [] };
-    }
+  // Add city to favorites
+  favorites.push(city);
 
-    // Ensure data structure is correct
-    if (!data.favorites || !Array.isArray(data.favorites)) {
-      data.favorites = [];
-    }
-
-    // Check if city already exists (case-insensitive)
-    const cityExists = data.favorites.some(
-      (existingCity) => existingCity.toLowerCase() === trimmedCity.toLowerCase()
-    );
-
-    if (cityExists) {
-      return res.status(409).json({
-        error: "City already exists",
-        message: `"${trimmedCity}" is already in your favorites`,
-      });
-    }
-
-    // Add city to favorites
-    data.favorites.push(trimmedCity);
-
-    // Write back to file
-    try {
-      fs.writeFileSync(favoritesFile, JSON.stringify(data, null, 2));
-    } catch (writeError) {
-      console.error("Error writing to favorites file:", writeError.message);
-      return res.status(500).json({
-        error: "Failed to save favorite",
-        message: "Unable to save the city to favorites. Please try again.",
-      });
-    }
-
+  if (writeFavoritesFile(favorites)) {
     res.json({
       message: "City added successfully",
-      city: trimmedCity,
-      totalFavorites: data.favorites.length,
+      city,
+      totalFavorites: favorites.length,
     });
-  } catch (error) {
-    console.error("Error in POST /favorites:", error.message);
+  } else {
     res.status(500).json({
-      error: "Internal server error",
-      message:
-        "An unexpected error occurred while adding the city to favorites",
+      error: "Failed to save favorite",
+      message: "Unable to save the city to favorites. Please try again.",
     });
   }
 });
 
 router.get("/favorites", (req, res) => {
-  try {
-    let data;
+  const favorites = readFavoritesFile();
+  res.json({
+    favorites,
+    count: favorites.length,
+  });
+});
 
-    // Try to read the favorites file
-    try {
-      const fileContent = fs.readFileSync(favoritesFile, "utf8");
-      data = JSON.parse(fileContent);
-    } catch (fileError) {
-      console.error("Error reading favorites file:", fileError.message);
+router.delete("/favorites/:city", validateCityInput, (req, res) => {
+  const city = req.validatedCity;
+  const favorites = readFavoritesFile();
 
-      if (fileError.code === "ENOENT") {
-        // File doesn't exist, create it with empty favorites
-        const initialData = { favorites: [] };
-        try {
-          fs.writeFileSync(favoritesFile, JSON.stringify(initialData, null, 2));
-          data = initialData;
-        } catch (createError) {
-          console.error("Error creating favorites file:", createError.message);
-          return res.status(500).json({
-            error: "File system error",
-            message: "Unable to access favorites data",
-          });
-        }
-      } else {
-        // File exists but is corrupted or unreadable
-        return res.status(500).json({
-          error: "Data corruption",
-          message: "Favorites data is corrupted. Please contact support.",
-        });
-      }
-    }
+  const cityIndex = favorites.findIndex(
+    (fav) => fav.toLowerCase() === city.toLowerCase()
+  );
 
-    // Ensure data structure is correct
-    if (!data || typeof data !== "object") {
-      data = { favorites: [] };
-    }
-
-    if (!data.favorites || !Array.isArray(data.favorites)) {
-      data.favorites = [];
-    }
-
-    // Filter out any invalid entries (non-strings or empty strings)
-    const validFavorites = data.favorites.filter(
-      (city) => typeof city === "string" && city.trim().length > 0
-    );
-
-    res.json({
-      favorites: validFavorites,
-      count: validFavorites.length,
+  if (cityIndex === -1) {
+    return res.status(404).json({
+      error: "City not found",
+      message: `"${city}" is not in your favorites`,
     });
-  } catch (error) {
-    console.error("Error in GET /favorites:", error.message);
+  }
+
+  favorites.splice(cityIndex, 1);
+
+  if (writeFavoritesFile(favorites)) {
+    res.json({
+      message: "City removed successfully",
+      city,
+      totalFavorites: favorites.length,
+    });
+  } else {
     res.status(500).json({
-      error: "Internal server error",
-      message: "An unexpected error occurred while fetching favorites",
+      error: "Failed to remove favorite",
+      message: "Unable to remove the city from favorites. Please try again.",
     });
   }
 });

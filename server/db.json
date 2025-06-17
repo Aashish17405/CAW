@@ -1,1 +1,7 @@
-{ "favorites": ["hyderabad", "delhi"] }
+{
+  "favorites": [
+    "hyderabad",
+    "delhi",
+    "dubai"
+  ]
+}
