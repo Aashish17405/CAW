@@ -8,12 +8,9 @@ import {
   ThermometerSun,
   Wind,
 } from "lucide-react";
-import { useState } from "react";
 import { getWeatherIcon } from "../utils/weatherUtils";
 
-export default function WeatherCard({ weather }) {
-  const [isCelsius, setIsCelsius] = useState(true);
-
+export default function WeatherCard({ weather, isCelsius }) {
   // Validate weather data
   if (!weather || !weather.main || !weather.weather || !weather.weather[0]) {
     return (
@@ -47,17 +44,9 @@ export default function WeatherCard({ weather }) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-3xl font-bold text-blue-300">
-            {weather.name || "Unknown"}, {weather.sys?.country || "Unknown"}
-          </h2>
-          <button
-            onClick={() => setIsCelsius(!isCelsius)}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-          >
-            {isCelsius ? "°C" : "°F"}
-          </button>
-        </div>
+        <h2 className="text-3xl font-bold text-blue-300">
+          {weather.name || "Unknown"}, {weather.sys?.country || "Unknown"}
+        </h2>
         <div className="flex items-center justify-center gap-4 mb-4">
           <div className="text-6xl">{weatherIcon}</div>
           <div>

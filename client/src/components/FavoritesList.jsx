@@ -99,7 +99,7 @@ export default function FavoritesList({ onCitySelect, refreshTrigger }) {
               >
                 <button
                   onClick={() => onCitySelect(city)}
-                  className="flex-1 text-left text-white hover:text-blue-300 transition-colors"
+                  className="flex-1 text-left text-white hover:text-blue-300 transition-colors cursor-pointer"
                 >
                   {city}
                 </button>

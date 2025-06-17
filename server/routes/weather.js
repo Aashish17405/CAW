@@ -202,10 +202,25 @@ const readFavoritesFile = () => {
 
 const writeFavoritesFile = (favorites) => {
   try {
+    // Ensure the file exists
+    if (!fs.existsSync(favoritesFile)) {
+      fs.writeFileSync(
+        favoritesFile,
+        JSON.stringify({ favorites: [] }, null, 2)
+      );
+    }
+
+    // Try to write the file
     fs.writeFileSync(favoritesFile, JSON.stringify({ favorites }, null, 2));
     return true;
   } catch (error) {
     console.error("Error writing to favorites file:", error.message);
+    // Log more details about the error
+    console.error("Error details:", {
+      code: error.code,
+      path: favoritesFile,
+      message: error.message,
+    });
     return false;
   }
 };
