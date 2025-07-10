@@ -18,8 +18,6 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-connectWithRetry();
-
 app.use(cors());
 app.use(express.json());
 app.use("/weather", weatherRoutes);
