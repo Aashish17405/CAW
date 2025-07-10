@@ -2,74 +2,48 @@ import { useState, useEffect } from "react";
 import { Star, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
-const API = import.meta.env.VITE_API_URL;
+const FAVORITES_STORAGE_KEY = "weatherAppFavorites";
 
-export default function FavoritesList({ onCitySelect, refreshTrigger ,triggerRefresh}) {
+export default function FavoritesList({ onCitySelect, refreshTrigger, triggerRefresh }) {
   const [favorites, setFavorites] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Removed loading and error states as localStorage operations are synchronous and less prone to a "loading" state or typical fetch errors.
+  // We can add specific error handling for localStorage if needed (e.g., storage full).
 
   useEffect(() => {
-    fetchFavorites();
+    loadFavoritesFromLocalStorage();
   }, [refreshTrigger]);
 
-  const fetchFavorites = async () => {
+  const loadFavoritesFromLocalStorage = () => {
     try {
-      const res = await fetch(`${API}/favorites`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to fetch favorites");
+      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      if (storedFavorites) {
+        setFavorites(JSON.parse(storedFavorites));
+      } else {
+        setFavorites([]);
       }
-
-      setFavorites(data.favorites);
-      setError(null);
     } catch (error) {
-      console.error("Error fetching favorites:", error);
-      setError(error.message || "Failed to fetch favorites");
-      toast.error(error.message || "Failed to fetch favorites");
-    } finally {
-      setLoading(false);
+      console.error("Error loading favorites from localStorage:", error);
+      toast.error("Could not load favorites.");
+      setFavorites([]); // Reset to empty array on error
     }
   };
 
-  const removeFavorite = async (city) => {
+  const removeFavoriteInLocalStorage = (cityToRemove) => {
     try {
-      const res = await fetch(`${API}/favorites/${city}`, {
-        method: "DELETE",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to remove favorite");
-      }
-
-      setFavorites((prev) => prev.filter((fav) => fav !== city));
-      toast.success(`${city} removed from favorites`);
+      const currentFavorites = JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || "[]");
+      const updatedFavorites = currentFavorites.filter(city => city.toLowerCase() !== cityToRemove.toLowerCase());
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(updatedFavorites));
+      setFavorites(updatedFavorites); // Update component state
+      toast.success(`${cityToRemove} removed from favorites`);
     } catch (error) {
-      console.error("Error removing favorite:", error);
-      toast.error(error.message || "Failed to remove favorite");
+      console.error("Error removing favorite from localStorage:", error);
+      toast.error(`Failed to remove ${cityToRemove} from favorites.`);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-gray-700/50">
-        <h2 className="text-2xl font-semibold mb-4">Favorites</h2>
-        <p className="text-gray-400">Loading favorites...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-gray-700/50">
-        <h2 className="text-2xl font-semibold mb-4">Favorites</h2>
-        <p className="text-red-400">{error}</p>
-      </div>
-    );
-  }
+  // No loading state needed for localStorage, render directly.
+  // Error state can be simplified or handled differently if specific localStorage errors need to be shown.
+  // For now, errors are logged and a toast is shown.
 
   return (
     <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-gray-700/50">
@@ -80,18 +54,18 @@ export default function FavoritesList({ onCitySelect, refreshTrigger ,triggerRef
         <ul className="space-y-2">
           {favorites.map((city) => (
             <li
-              key={city}
+              key={city} // Assuming city names are unique enough for keys here
               className="flex items-center justify-between bg-gray-700/50 p-3 rounded-lg hover:bg-gray-700/70 transition-colors"
             >
               <button
-                onClick={() => {onCitySelect(city); triggerRefresh(true)}}
+                onClick={() => { onCitySelect(city); triggerRefresh(true); }}
                 className="flex items-center gap-2 text-white hover:text-blue-400 transition-colors"
               >
                 <Star className="w-4 h-4" />
                 <span className="capitalize">{city}</span>
               </button>
               <button
-                onClick={() => removeFavorite(city)}
+                onClick={() => removeFavoriteInLocalStorage(city)}
                 className="text-gray-400 hover:text-red-400 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
