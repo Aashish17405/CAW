@@ -485,6 +485,21 @@ export default function App() {
     }
   }, [refresh]);
 
+  useEffect(() => {
+    // Initialize default favorites on first load if the item doesn't exist in localStorage
+    const initializeDefaultFavorites = () => {
+      // Check if the FAVORITES_STORAGE_KEY item does not exist in localStorage at all
+      if (localStorage.getItem(FAVORITES_STORAGE_KEY) === null) {
+        const defaultFavorites = ["Douala", "Banos", "Iqaluit"];
+        localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(defaultFavorites));
+        // Trigger a refresh for FavoritesList to pick up the new defaults
+        setRefreshFavorites(prev => prev + 1);
+        toast.success("Default favorites added!");
+      }
+    };
+    initializeDefaultFavorites();
+  }, []); // Empty dependency array ensures this runs only once on mount
+
   return (
     <div
       className={`min-h-screen w-full ${backgroundClass} text-white transition-colors duration-500`}
