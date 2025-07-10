@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
-const Favorite = require("../models/Favorite");
+// Favorite model is no longer needed
+// const Favorite = require("../models/Favorite");
 
 const router = express.Router();
 const API_KEY = process.env.API_KEY || "78ed8eb3a3019fb3af547bf878796675";
@@ -156,84 +157,7 @@ router.get("/livecast", async (req, res) => {
   }
 });
 
-router.post("/favorites", validateCityInput, async (req, res) => {
-  const city = req.validatedCity;
-
-  try {
-    const existingFavorite = await Favorite.findOne({
-      city: city.toLowerCase(),
-    });
-    if (existingFavorite) {
-      return res.status(409).json({
-        error: "City already exists",
-        message: `"${city}" is already in your favorites`,
-      });
-    }
-
-    const favorite = new Favorite({ city: city.toLowerCase() });
-    await favorite.save();
-
-    const totalFavorites = await Favorite.countDocuments();
-
-    res.json({
-      message: "City added successfully",
-      city,
-      totalFavorites,
-    });
-  } catch (error) {
-    console.error("Error adding favorite:", error);
-    res.status(500).json({
-      error: "Failed to save favorite",
-      message: "Unable to save the city to favorites. Please try again.",
-    });
-  }
-});
-
-router.get("/favorites", async (req, res) => {
-  try {
-    const favorites = await Favorite.find().sort({ createdAt: -1 });
-    res.json({
-      favorites: favorites.map((fav) => fav.city),
-      count: favorites.length,
-    });
-  } catch (error) {
-    console.error("Error fetching favorites:", error);
-    res.status(500).json({
-      error: "Failed to fetch favorites",
-      message: "Unable to fetch favorites. Please try again.",
-    });
-  }
-});
-
-router.delete("/favorites/:city", validateCityInput, async (req, res) => {
-  const city = req.validatedCity;
-
-  try {
-    const result = await Favorite.findOneAndDelete({
-      city: city.toLowerCase(),
-    });
-
-    if (!result) {
-      return res.status(404).json({
-        error: "City not found",
-        message: `"${city}" is not in your favorites`,
-      });
-    }
-
-    const totalFavorites = await Favorite.countDocuments();
-
-    res.json({
-      message: "City removed successfully",
-      city,
-      totalFavorites,
-    });
-  } catch (error) {
-    console.error("Error removing favorite:", error);
-    res.status(500).json({
-      error: "Failed to remove favorite",
-      message: "Unable to remove the city from favorites. Please try again.",
-    });
-  }
-});
+// Removed POST /favorites, GET /favorites, and DELETE /favorites/:city routes
+// as favorites are now handled on the client-side with localStorage.
 
 module.exports = router;

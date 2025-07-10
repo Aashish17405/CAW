@@ -251,32 +251,35 @@ export default function App() {
     }
   };
 
-  const addFavorite = async () => {
-    if (!validateCity()) return;
+  const FAVORITES_STORAGE_KEY = "weatherAppFavorites"; // Ensure this matches the key in FavoritesList.jsx
+
+  const addFavoriteToLocalStorage = () => {
+    if (!validateCity()) return; // validateCity already sets an error message if needed
+
+    const cityToAdd = city.trim(); // Use the validated and trimmed city name
 
     try {
-      const res = await fetch(`${API}/favorites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city }),
-      });
+      let currentFavorites = JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || "[]");
 
-      const data = await res.json();
+      // Normalize both current favorites and cityToAdd for case-insensitive comparison
+      const normalizedCurrentFavorites = currentFavorites.map(favCity => favCity.toLowerCase());
+      const normalizedCityToAdd = cityToAdd.toLowerCase();
 
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to add to favorites");
+      if (normalizedCurrentFavorites.includes(normalizedCityToAdd)) {
+        toast.error(`${cityToAdd} is already in favorites.`);
+        return;
       }
 
-      toast.success(`${city} added to favorites`);
-      setRefreshFavorites((prev) => prev + 1);
+      // Add the original casing of the city to favorites
+      currentFavorites.push(cityToAdd);
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(currentFavorites));
+      toast.success(`${cityToAdd} added to favorites`);
+      setRefreshFavorites((prev) => prev + 1); // Trigger refresh in FavoritesList
     } catch (error) {
-      console.error("Error adding favorite:", error);
-      setError(
-        error.message || "Failed to add to favorites. Please try again."
-      );
-      toast.error(
-        error.message || "Failed to add to favorites. Please try again."
-      );
+      console.error("Error adding favorite to localStorage:", error);
+      toast.error("Failed to add to favorites. Please try again.");
+      // setError might be too aggressive here, as the main app functionality isn't broken.
+      // A toast is usually sufficient for this kind of error.
     }
   };
 
@@ -568,7 +571,7 @@ export default function App() {
                     {locationLoading ? <Spinner /> : "Weather in Your Place"}
                   </button>
                   <button
-                    onClick={addFavorite}
+                    onClick={addFavoriteToLocalStorage}
                     className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105"
                   >
                     Add Favorite
